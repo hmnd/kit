@@ -75,7 +75,8 @@ export default function () {
 			builder.log.minor('Copying assets...');
 			const prefixedBucket = `${site.bucket}${builder.config.kit.paths.base}`;
 			builder.writeClient(prefixedBucket);
-			builder.writePrerendered(prefixedBucket);}
+			builder.writePrerendered(prefixedBucket);
+		}
 	};
 }
 
