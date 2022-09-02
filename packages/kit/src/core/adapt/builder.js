@@ -129,6 +129,10 @@ export function create_builder({ config, build_data, routes, prerendered, log })
 			return config.kit.files.assets;
 		},
 
+		getPrefixedAppDirectory() {
+			return build_data.prefix;
+		},
+
 		writeClient(dest) {
 			return [...copy(`${config.kit.outDir}/output/client`, dest)];
 		},
