@@ -4,7 +4,7 @@ import * as Cache from 'worktop/cfw.cache';
 
 const server = new Server(manifest);
 
-const prefix = `/${manifest.appDir}/`;
+const { prefix } = manifest;
 
 /** @type {import('worktop/cfw').Module.Worker<{ ASSETS: import('worktop/cfw.durable').Durable.Object }>} */
 const worker = {
