@@ -67,6 +67,7 @@ export interface Builder {
 	getClientDirectory(): string;
 	getServerDirectory(): string;
 	getStaticDirectory(): string;
+	getPrefixedAppDirectory(): string;
 
 	/**
 	 * @param dest the destination folder to which files should be copied
@@ -323,6 +324,7 @@ export interface ServerInitOptions {
 
 export interface SSRManifest {
 	appDir: string;
+	prefix: string;
 	assets: Set<string>;
 	mimeTypes: Record<string, string>;
 

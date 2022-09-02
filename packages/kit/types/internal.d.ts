@@ -47,6 +47,7 @@ export interface Asset {
 
 export interface BuildData {
 	app_dir: string;
+	prefix: string;
 	manifest_data: ManifestData;
 	service_worker: string | null;
 	client: {
