@@ -1,6 +1,6 @@
 {
 	"name": "@icewolf/svelte-kit",
-	"version": "1.0.0-next.463.bleeding.1",
+	"version": "1.0.0-next.483.bleeding.0",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/sveltejs/kit",
