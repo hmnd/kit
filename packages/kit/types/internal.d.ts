@@ -1,12 +1,10 @@
 import { OutputAsset, OutputChunk } from 'rollup';
 import { SvelteComponent } from 'svelte/internal';
 import {
-	Action,
 	Config,
-	ExternalFetch,
 	ServerLoad,
 	Handle,
-	HandleError,
+	HandleServerError,
 	KitConfig,
 	Load,
 	RequestEvent,
@@ -14,7 +12,10 @@ import {
 	ResolveOptions,
 	Server,
 	ServerInitOptions,
-	SSRManifest
+	SSRManifest,
+	HandleFetch,
+	Actions,
+	HandleClientError
 } from './index.js';
 import {
 	HttpMethod,
@@ -90,15 +91,14 @@ export type CSRRoute = {
 
 export type GetParams = (match: RegExpExecArray) => Record<string, string>;
 
-export interface Hooks {
-	externalFetch: ExternalFetch;
+export interface ServerHooks {
+	handleFetch: HandleFetch;
 	handle: Handle;
-	handleError: HandleError;
+	handleError: HandleServerError;
 }
 
-export interface ImportNode {
-	name: string;
-	dynamic: boolean;
+export interface ClientHooks {
+	handleError: HandleClientError;
 }
 
 export class InternalServer extends Server {
@@ -116,11 +116,6 @@ export interface ManifestData {
 	nodes: PageNode[];
 	routes: RouteData[];
 	matchers: Record<string, string>;
-}
-
-export interface MethodOverride {
-	parameter: string;
-	allowed: string[];
 }
 
 export interface PageNode {
@@ -232,9 +227,11 @@ export interface ServerDataSkippedNode {
  */
 export interface ServerErrorNode {
 	type: 'error';
-	// Either-or situation, but we don't want to have to do a type assertion
-	error?: Record<string, any>;
-	httperror?: { status: number; message: string };
+	error: App.PageError;
+	/**
+	 * Only set for HttpErrors
+	 */
+	status?: number;
 }
 
 export interface SSRComponent {
@@ -277,10 +274,7 @@ export interface SSRNode {
 		prerender?: PrerenderOption;
 		ssr?: boolean;
 		csr?: boolean;
-		POST?: Action;
-		PATCH?: Action;
-		PUT?: Action;
-		DELETE?: Action;
+		actions?: Actions;
 	};
 
 	// store this in dev so we can print serialization errors
@@ -295,11 +289,9 @@ export interface SSROptions {
 		check_origin: boolean;
 	};
 	dev: boolean;
-	get_stack: (error: Error) => string | undefined;
-	handle_error(error: Error & { frame?: string }, event: RequestEvent): void;
-	hooks: Hooks;
+	handle_error(error: Error & { frame?: string }, event: RequestEvent): App.PageError;
+	hooks: ServerHooks;
 	manifest: SSRManifest;
-	method_override: MethodOverride;
 	paths: {
 		base: string;
 		assets: string;

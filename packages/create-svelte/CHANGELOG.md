@@ -1,5 +1,43 @@
 # create-svelte
 
+## 2.0.0-next.177
+
+### Patch Changes
+
+- [chore] bump vite ([#6829](https://github.com/sveltejs/kit/pull/6829))
+
+## 2.0.0-next.176
+
+### Patch Changes
+
+- SvelteKit 1.0 RC ([#6707](https://github.com/sveltejs/kit/pull/6707))
+
+## 2.0.0-next.175
+
+### Patch Changes
+
+- [breaking] update use:enhance usage ([#6697](https://github.com/sveltejs/kit/pull/6697))
+
+* [breaking] hooks file rename ([#6697](https://github.com/sveltejs/kit/pull/6697))
+
+## 2.0.0-next.174
+
+### Patch Changes
+
+- Remove cookie package from demo app ([#6602](https://github.com/sveltejs/kit/pull/6602))
+
+## 2.0.0-next.173
+
+### Patch Changes
+
+- [breaking] Replace `POST`/`PUT`/`PATCH`/`DELETE` in `+page.server.js` with `export const actions` ([#6469](https://github.com/sveltejs/kit/pull/6469))
+
+## 2.0.0-next.172
+
+### Patch Changes
+
+- Bump vite-plugin-svelte and required vite version ([#6583](https://github.com/sveltejs/kit/pull/6583))
+
 ## 2.0.0-next.171
 
 ### Patch Changes

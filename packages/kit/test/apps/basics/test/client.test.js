@@ -11,12 +11,8 @@ test.describe('beforeNavigate', () => {
 	test('prevents navigation triggered by link click', async ({ clicknav, page, baseURL }) => {
 		await page.goto('/before-navigate/prevent-navigation');
 
-		try {
-			await clicknav('[href="/before-navigate/a"]', { timeout: 1000 });
-			expect(false).toBe(true);
-		} catch (/** @type {any} */ e) {
-			expect(e.message).toMatch('page.waitForNavigation: Timeout 1000ms exceeded');
-		}
+		await page.click('[href="/before-navigate/a"]');
+		await page.waitForLoadState('networkidle');
 
 		expect(page.url()).toBe(baseURL + '/before-navigate/prevent-navigation');
 		expect(await page.innerHTML('pre')).toBe('true');
@@ -381,6 +377,25 @@ test.describe('Load', () => {
 		expect(await page.textContent('pre')).toBe(JSON.stringify({ foo: { bar: 'Custom layout' } }));
 	});
 
+	test('keeps server data when valid while not reusing client load data', async ({ page }) => {
+		await page.goto('/load/url-query-param');
+
+		expect(await page.textContent('h1')).toBe('Hello ');
+		expect(await page.textContent('p')).toBe('This text comes from the server load function');
+
+		await page.click('a[href="/load/url-query-param?currentClientState=ABC"]');
+		expect(await page.textContent('h1')).toBe('Hello ABC');
+		expect(await page.textContent('p')).toBe('This text comes from the server load function');
+
+		await page.click('a[href="/load/url-query-param?currentClientState=DEF"]');
+		expect(await page.textContent('h1')).toBe('Hello DEF');
+		expect(await page.textContent('p')).toBe('This text comes from the server load function');
+
+		await page.click('a[href="/load/url-query-param"]');
+		expect(await page.textContent('h1')).toBe('Hello ');
+		expect(await page.textContent('p')).toBe('This text comes from the server load function');
+	});
+
 	test('load does not call fetch if max-age allows it', async ({ page, request }) => {
 		await request.get('/load/cache-control/reset');
 
@@ -555,6 +570,9 @@ test.describe('Routing', () => {
 		await page.click('[href="#target"]');
 		expect(await page.textContent('#window-hash')).toBe('#target');
 		expect(await page.textContent('#page-url-hash')).toBe('#target');
+		await page.click('[href="/routing/hashes/pagestore"]');
+		await expect(page.locator('#window-hash')).toHaveText('#target'); // hashchange doesn't fire for these
+		await expect(page.locator('#page-url-hash')).toHaveText('');
 	});
 
 	test('does not normalize external path', async ({ page }) => {

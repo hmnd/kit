@@ -112,74 +112,7 @@ During client-side navigation, SvelteKit will load this data from the server, wh
 
 Like `+page.js`, `+page.server.js` can export [page options](/docs/page-options) — `prerender`, `ssr` and `csr`.
 
-#### Actions
-
-`+page.server.js` can also declare _actions_, which correspond to the `POST`, `PATCH`, `PUT` and `DELETE` HTTP methods. A request made to the page with one of these methods will invoke the corresponding action before rendering the page.
-
-An action can return a `{ status?, errors }` object if there are validation errors (`status` defaults to `400`), or an optional `{ location }` object to redirect the user to another page:
-
-```js
-/// file: src/routes/login/+page.server.js
-
-// @filename: ambient.d.ts
-declare global {
-	const createSessionCookie: (userid: string) => string;
-	const hash: (content: string) => string;
-	const db: {
-		findUser: (name: string) => Promise<{
-			id: string;
-			username: string;
-			password: string;
-		}>
-	}
-}
-
-export {};
-
-// @filename: index.js
-// ---cut---
-import { error } from '@sveltejs/kit';
-
-/** @type {import('./$types').Action} */
-export async function POST({ request, setHeaders, url }) {
-	const values = await request.formData();
-
-	const username = /** @type {string} */ (values.get('username'));
-	const password = /** @type {string} */ (values.get('password'));
-
-	const user = await db.findUser(username);
-
-	if (!user) {
-		return {
-			status: 403,
-			errors: {
-				username: 'No user with this username'
-			}
-		};
-	}
-
-	if (user.password !== hash(password)) {
-		return {
-			status: 403,
-			errors: {
-				password: 'Incorrect password'
-			}
-		};
-	}
-
-	setHeaders({
-		'set-cookie': createSessionCookie(user.id)
-	});
-
-	return {
-		location: url.searchParams.get('redirectTo') ?? '/'
-	};
-}
-```
-
-If validation `errors` are returned, they will be available inside `+page.svelte` as `export let errors`.
-
-> The actions API will likely change in the near future: https://github.com/sveltejs/kit/discussions/5875
+A `+page.server.js` file can also export _actions_. If `load` lets you read data from the server, `actions` let you write data _to_ the server using the `<form>` element. To learn how to use them, see the [form actions](/docs/form-actions) section.
 
 ### +error
 
@@ -194,7 +127,7 @@ If an error occurs during `load`, SvelteKit will render a default error page. Yo
 <h1>{$page.status}: {$page.error.message}</h1>
 ```
 
-SvelteKit will 'walk up the tree' looking for the closest error boundary — if the file above didn't exist it would try `src/routes/blog/+error.svelte` and `src/routes/+error.svelte` before rendering the default error page. If _that_ fails, SvelteKit will bail out and render a static fallback error page, which you can customise by creating a `src/error.html` file.
+SvelteKit will 'walk up the tree' looking for the closest error boundary — if the file above didn't exist it would try `src/routes/blog/+error.svelte` and `src/routes/+error.svelte` before rendering the default error page. If _that_ fails (or if the error was thrown from the `load` function of the root `+layout`, which sits 'above' the root `+error`), SvelteKit will bail out and render a static fallback error page, which you can customise by creating a `src/error.html` file.
 
 ### +layout
 

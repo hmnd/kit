@@ -56,6 +56,13 @@ declare namespace App {
 	 * If your adapter provides [platform-specific context](https://kit.svelte.dev/docs/adapters#supported-environments-platform-specific-context) via `event.platform`, you can specify it here.
 	 */
 	export interface Platform {}
+
+	/**
+	 * Defines the common shape of expected and unexpected errors. Expected errors are thrown using the `error` function. Unexpected errors are handled by the `handleError` hooks which should return this shape.
+	 */
+	export interface PageError {
+		message: string;
+	}
 }
 
 /**
@@ -82,6 +89,68 @@ declare module '$app/environment' {
 
 /**
  * ```ts
+ * import { enhance, applyAction } from '$app/forms';
+ * ```
+ */
+declare module '$app/forms' {
+	import type { ActionResult } from '@sveltejs/kit';
+
+	export type SubmitFunction<
+		Success extends Record<string, unknown> | undefined = Record<string, any>,
+		Invalid extends Record<string, unknown> | undefined = Record<string, any>
+	> = (input: {
+		action: URL;
+		data: FormData;
+		form: HTMLFormElement;
+		controller: AbortController;
+		cancel: () => void;
+	}) =>
+		| void
+		| ((opts: {
+				form: HTMLFormElement;
+				action: URL;
+				result: ActionResult<Success, Invalid>;
+		  }) => void);
+
+	/**
+	 * This action enhances a `<form>` element that otherwise would work without JavaScript.
+	 * @param form The form element
+	 * @param options Callbacks for different states of the form lifecycle
+	 */
+	export function enhance<
+		Success extends Record<string, unknown> | undefined = Record<string, any>,
+		Invalid extends Record<string, unknown> | undefined = Record<string, any>
+	>(
+		form: HTMLFormElement,
+		/**
+		 * Called upon submission with the given FormData and the `action` that should be triggered.
+		 * If `cancel` is called, the form will not be submitted.
+		 * You can use the abort `controller` to cancel the submission in case another one starts.
+		 * If a function is returned, that function is called with the response from the server.
+		 * If nothing is returned, the fallback will be used.
+		 *
+		 * If this function or its return value isn't set, it
+		 * - falls back to updating the `form` prop with the returned data if the action is one same page as the form
+		 * - updates `$page.status`
+		 * - invalidates all data in case of successful submission with no redirect response
+		 * - redirects in case of a redirect response
+		 * - redirects to the nearest error page in case of an unexpected error
+		 */
+		submit?: SubmitFunction<Success, Invalid>
+	): { destroy: () => void };
+
+	/**
+	 * This action updates the `form` property of the current page with the given data and updates `$page.status`.
+	 * In case of an error, it redirects to the nearest error page.
+	 */
+	export function applyAction<
+		Success extends Record<string, unknown> | undefined = Record<string, any>,
+		Invalid extends Record<string, unknown> | undefined = Record<string, any>
+	>(result: ActionResult<Success, Invalid>): Promise<void>;
+}
+
+/**
+ * ```ts
  * import {
  * 	afterNavigate,
  * 	beforeNavigate,
@@ -95,6 +164,8 @@ declare module '$app/environment' {
  * ```
  */
 declare module '$app/navigation' {
+	import { Navigation } from '@sveltejs/kit';
+
 	/**
 	 * If called when the page is being updated following a navigation (in `onMount` or `afterNavigate` or an action, for example), this disables SvelteKit's built-in scroll handling.
 	 * This is generally discouraged, since it breaks user expectations.
@@ -158,17 +229,23 @@ declare module '$app/navigation' {
 	export function prefetchRoutes(routes?: string[]): Promise<void>;
 
 	/**
-	 * A navigation interceptor that triggers before we navigate to a new URL (internal or external) whether by clicking a link, calling `goto`, or using the browser back/forward controls.
-	 * This is helpful if we want to conditionally prevent a navigation from completing or lookup the upcoming url.
+	 * A navigation interceptor that triggers before we navigate to a new URL, whether by clicking a link, calling `goto(...)`, or using the browser back/forward controls.
+	 * Calling `cancel()` will prevent the navigation from completing.
+	 *
+	 * When navigating to an external URL, `navigation.to` will be `null`.
+	 *
+	 * `beforeNavigate` must be called during a component initialization. It remains active as long as the component is mounted.
 	 */
 	export function beforeNavigate(
-		fn: (navigation: { from: URL; to: URL | null; cancel: () => void }) => void
+		callback: (navigation: Navigation & { cancel: () => void }) => void
 	): void;
 
 	/**
-	 * A lifecycle function that runs when the page mounts, and also whenever SvelteKit navigates to a new URL but stays on this component.
+	 * A lifecycle function that runs the supplied `callback` when the current component mounts, and also whenever we navigate to a new URL.
+	 *
+	 * `afterNavigate` must be called during a component initialization. It remains active as long as the component is mounted.
 	 */
-	export function afterNavigate(fn: (navigation: { from: URL | null; to: URL }) => void): void;
+	export function afterNavigate(callback: (navigation: Navigation) => void): void;
 }
 
 /**
@@ -210,7 +287,7 @@ declare module '$app/stores' {
 	export const page: Readable<Page>;
 	/**
 	 * A readable store.
-	 * When navigating starts, its value is `{ from: URL, to: URL }`,
+	 * When navigating starts, its value is a `Navigation` object with `from`, `to`, `type` and (if `type === 'popstate'`) `delta` properties.
 	 * When navigating finishes, its value reverts to `null`.
 	 */
 	export const navigating: Readable<Navigation | null>;
@@ -331,10 +408,11 @@ declare module '@sveltejs/kit/node/polyfills' {
  * Utilities used by adapters for Node-like environments.
  */
 declare module '@sveltejs/kit/node' {
-	export function getRequest(
-		base: string,
-		request: import('http').IncomingMessage
-	): Promise<Request>;
+	export function getRequest(opts: {
+		base: string;
+		request: import('http').IncomingMessage;
+		bodySizeLimit?: number;
+	}): Promise<Request>;
 	export function setResponse(res: import('http').ServerResponse, response: Response): void;
 }
 

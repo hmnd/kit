@@ -18,7 +18,7 @@ export function load(event) {
 
 ### Input properties
 
-The argument to a `load` function is a `LoadEvent` (or, for server-only `load` functions, a `ServerLoadEvent` which inherits `clientAddress`, `locals`, `platform` and `request` from `RequestEvent`). All events have the following properties:
+The argument to a `load` function is a `LoadEvent` (or, for server-only `load` functions, a `ServerLoadEvent` which inherits `clientAddress`, `cookies`, `locals`, `platform` and `request` from `RequestEvent`). All events have the following properties:
 
 #### data
 
@@ -143,7 +143,7 @@ export async function load({ depends }) {
 - it can be used to make credentialed requests on the server, as it inherits the `cookie` and `authorization` headers for the page request
 - it can make relative requests on the server (ordinarily, `fetch` requires a URL with an origin when used in a server context)
 - internal requests (e.g. for `+server.js` routes) go direct to the handler function when running on the server, without the overhead of an HTTP call
-- during server-side rendering, the response will be captured and inlined into the rendered HTML
+- during server-side rendering, the response will be captured and inlined into the rendered HTML. Note that headers will _not_ be serialized, unless explicitly included via [`filterSerializedResponseHeaders`](/docs/hooks#server-hooks-handle)
 - during hydration, the response will be read from the HTML, guaranteeing consistency and preventing an additional network request
 
 > Cookies will only be passed through if the target host is the same as the SvelteKit application or a more specific subdomain of it.
@@ -154,7 +154,7 @@ export async function load({ depends }) {
 
 ```js
 /// file: src/routes/+layout.server.js
-/** @type {import('./$types').LayoutLoad} */
+/** @type {import('./$types').LayoutServerLoad} */
 export function load() {
 	return { a: 1 };
 }
@@ -163,11 +163,11 @@ export function load() {
 ```js
 /// file: src/routes/foo/+layout.server.js
 // @filename: $types.d.ts
-export type LayoutLoad = import('@sveltejs/kit').Load<{}, null, { a: number }>;
+export type LayoutServerLoad = import('@sveltejs/kit').Load<{}, null, { a: number }>;
 
 // @filename: index.js
 // ---cut---
-/** @type {import('./$types').LayoutLoad} */
+/** @type {import('./$types').LayoutServerLoad} */
 export async function load({ parent }) {
 	const { a } = await parent();
 	console.log(a); // `1`
@@ -179,11 +179,11 @@ export async function load({ parent }) {
 ```js
 /// file: src/routes/foo/+page.server.js
 // @filename: $types.d.ts
-export type PageLoad = import('@sveltejs/kit').Load<{}, null, { a: number, b: number }>;
+export type PageServerLoad = import('@sveltejs/kit').Load<{}, null, { a: number, b: number }>;
 
 // @filename: index.js
 // ---cut---
-/** @type {import('./$types').PageLoad} */
+/** @type {import('./$types').PageServerLoad} */
 export async function load({ parent }) {
 	const { a, b } = await parent();
 	console.log(a, b); // `1`, `2`
@@ -199,11 +199,11 @@ Be careful not to introduce accidental waterfalls when using `await parent()`. I
 ```diff
 /// file: src/routes/foo/+page.server.js
 // @filename: $types.d.ts
-export type PageLoad = import('@sveltejs/kit').Load<{}, null, { a: number, b: number }>;
+export type PageServerLoad = import('@sveltejs/kit').Load<{}, null, { a: number, b: number }>;
 
 // @filename: index.js
 // ---cut---
-/** @type {import('./$types').PageLoad} */
+/** @type {import('./$types').PageServerLoad} */
 export async function load({ parent, fetch }) {
 -	const parentData = await parent();
 	const data = await fetch('./some-api');
@@ -221,6 +221,7 @@ export async function load({ parent, fetch }) {
 If you need to set headers for the response, you can do so using the `setHeaders` method. This is useful if you want the page to be cached, for example:
 
 ```js
+// @errors: 2322
 /// file: src/routes/blog/+page.js
 /** @type {import('./$types').PageLoad} */
 export async function load({ fetch, setHeaders }) {
@@ -240,25 +241,7 @@ export async function load({ fetch, setHeaders }) {
 
 Setting the same header multiple times (even in separate `load` functions) is an error — you can only set a given header once.
 
-The exception is `set-cookie`, which can be set multiple times and can be passed an array of strings:
-
-```js
-/// file: src/routes/+layout.server.js
-/** @type {import('./$types').LayoutLoad} */
-export async function load({ setHeaders }) {
-	setHeaders({
-		'set-cookie': 'a=1; HttpOnly'
-	});
-
-	setHeaders({
-		'set-cookie': 'b=2; HttpOnly'
-	});
-
-	setHeaders({
-		'set-cookie': ['c=3; HttpOnly', 'd=4; HttpOnly']
-	});
-}
-```
+You cannot add a `set-cookie` header with `setHeaders` — use the [`cookies`](/docs/types#sveltejs-kit-cookies) API in a server-only `load` function instead.
 
 ### Output
 
@@ -325,9 +308,7 @@ export function load({ locals }) {
 }
 ```
 
-If an _unexpected_ error is thrown, SvelteKit will invoke [`handleError`](/docs/hooks#handleerror) and treat it as a 500 Internal Server Error.
-
-> In development, stack traces for unexpected errors are visible as `$page.error.stack`. In production, stack traces are hidden.
+If an _unexpected_ error is thrown, SvelteKit will invoke [`handleError`](/docs/hooks#shared-hooks-handleerror) and treat it as a 500 Internal Error.
 
 ### Redirects
 
@@ -360,7 +341,7 @@ A `load` function will re-run in the following situations:
 - It references a property of `params` whose value has changed
 - It references a property of `url` (such as `url.pathname` or `url.search`) whose value has changed
 - It calls `await parent()` and a parent `load` function re-ran
-- It declared a dependency on a specific URL via [`fetch`](#fetch) or [`depends`](#depends), and that URL was marked invalid with [`invalidate(url)`](/docs/modules#$app-navigation-invalidate)
+- It declared a dependency on a specific URL via [`fetch`](#input-methods-fetch) or [`depends`](#input-methods-depends), and that URL was marked invalid with [`invalidate(url)`](/docs/modules#$app-navigation-invalidate)
 - All active `load` functions were forcibly re-run with [`invalidate()`](/docs/modules#$app-navigation-invalidate)
 
 If a `load` function is triggered to re-run, the page will not remount — instead, it will update with the new `data`. This means that components' internal state is preserved. If this isn't want you want, you can reset whatever you need to reset inside an [`afterNavigate`](/docs/modules#$app-navigation-afternavigate) callback, and/or wrap your component in a [`{#key ...}`](https://svelte.dev/docs#template-syntax-key) block.
